@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestor de Correio — Alavan</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@300;400&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:linear-gradient(150deg,#F4EFE6 0%,#EAE3D8 50%,#E2DACE 100%);min-height:100vh;font-family:'Nunito',sans-serif;display:flex;align-items:center;justify-content:center;padding:16px}
+input,textarea,select{font-family:'Nunito',sans-serif;font-size:14px;color:#1C1917;background:#FAFAF9;border:2px solid #E8E0D5;border-radius:10px;padding:11px 13px;width:100%;outline:none;transition:border 0.2s;box-sizing:border-box}
+input:focus,textarea:focus,select:focus{border-color:#1C1917}
+textarea{resize:vertical;line-height:1.7;min-height:200px}
+button{cursor:pointer;font-family:'Nunito',sans-serif}
+.card{background:#fff;border-radius:24px;width:100%;max-width:480px;box-shadow:0 8px 40px rgba(0,0,0,.10);overflow:hidden}
+.hdr{padding:22px 26px;text-align:center}
+.hdr h1{font-family:'Fraunces',serif;font-weight:300;color:#fff;margin:0;font-size:22px}
+.hdr p{color:rgba(255,255,255,.6);font-size:11px;margin-top:3px}
+.body{padding:18px 22px 22px}
+.btn-main{width:100%;background:#1C1917;color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:800;margin-top:16px;transition:opacity .2s}
+.btn-main:disabled{opacity:.5}
+.btn-main:hover:not(:disabled){opacity:.85}
+.error{background:#FEF2F2;border:1px solid #FECACA;border-radius:9px;padding:9px 12px;margin-top:10px;color:#991B1B;font-size:12px;font-weight:600}
+.success{background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px;padding:9px 12px;margin-bottom:10px;color:#15803D;font-size:12px;font-weight:600}
+.tabs{display:flex;gap:3px;background:#F3F0EB;border-radius:11px;padding:3px;margin-bottom:16px}
+.tab{flex:1;padding:7px 3px;border:none;border-radius:8px;font-family:'Nunito';font-weight:700;font-size:11px;background:transparent;color:#78716C;transition:all .15s}
+.tab.active{background:#fff;color:#1C1917;box-shadow:0 1px 6px rgba(0,0,0,.07)}
+label{display:block;font-weight:700;font-size:12px;color:#44403C;margin-bottom:4px;margin-top:10px}
+.info{background:#F0F9FF;border-radius:9px;padding:9px 11px;font-size:11px;color:#0369A1;margin-top:8px}
+.info code{font-family:monospace;font-size:10px;word-break:break-all}
+.progress-bar{background:#F3F0EB;border-radius:99px;height:4px;margin-bottom:14px}
+.progress-fill{background:#1B4332;border-radius:99px;height:4px;transition:width .4s}
+.email-from{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.avatar{width:42px;height:42px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0}
+.badge{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:800}
+.preview{background:#FAFAF9;border-radius:9px;padding:10px 12px;font-size:13px;color:#44403C;line-height:1.7;border-left:3px solid #E8E0D5;margin-bottom:10px}
+.ai-box{background:#F0FDF4;border:1px solid #BBF7D0;border-radius:9px;padding:10px 12px;margin-bottom:12px}
+.actions{display:flex;gap:5px;margin-bottom:5px}
+.actions2{display:flex;gap:5px}
+.act-btn{flex:1;background:#1B4332;color:#fff;border:none;border-radius:11px;padding:12px 4px;font-family:'Nunito';font-weight:800;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:3px;transition:all .15s}
+.act-btn:disabled{background:#E5E7EB;color:#9CA3AF}
+.act-btn.sm{padding:9px 3px;font-size:10px}
+.act-btn:hover:not(:disabled){filter:brightness(1.15);transform:translateY(-2px)}
+.act-btn span.ico{font-size:19px}
+.act-btn.sm span.ico{font-size:17px}
+.fiscal-hdr{background:#4A1D96}
+.fiscal-info{background:#F5F3FF;border-left:3px solid #7C3AED;padding:8px 13px;font-size:11px;color:#4A1D96;font-weight:600}
+.reply-btns{display:flex;gap:8px;margin-top:12px}
+.reply-back{flex:1;background:#F3F4F6;color:#374151;border:none;border-radius:11px;padding:11px;font-family:'Nunito';font-weight:700;font-size:12px}
+.reply-send{flex:2;color:#fff;border:none;border-radius:11px;padding:11px;font-family:'Nunito';font-weight:800;font-size:12px}
+.reply-send:disabled{opacity:.5}
+.done-wrap{text-align:center;padding:36px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.pulse{animation:pulse 1.5s infinite}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────
+const GRAPH = 'https://graph.microsoft.com/v1.0';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
+
+const FISCAL = `És especialista sénior em direito fiscal português e assessora OCC. Respondes em português de Portugal.
+ÁREAS: IVA (CIVA, RITI), IRC (CIRC, RETGS, RFAI), IRS (CIRS, RNH/IFICI), IMT (CIMT), CE/Internacional (CDT, ATAD, BEPS).
+AO RESPONDER: fundamenta com artigos específicos (art.º X.º do CIVA/CIRC/CIRS/CIMT), referencia Informações Vinculativas AT, cita Pareceres OCC, indica prazos declarativos, alerta para riscos fiscais.
+FORMATO: resposta objetiva → fundamentação legal → referências AT/OCC → alertas.`;
+
+const DEMO = [
+  {id:'d1',subject:'Dúvida IVA intracomunitário — serviços Espanha',from:{emailAddress:{name:'Carlos Mendes',address:'c.mendes@cliente.pt'}},isDirect:true,receivedDateTime:new Date(Date.now()-1800000).toISOString(),bodyPreview:'Bom dia Dra. Gisela, venho solicitar esclarecimento sobre a dedutibilidade do IVA numa aquisição intracomunitária de serviços de consultoria a fornecedor espanhol, no valor de 15.000€. A nossa empresa é sujeito passivo de IVA em Portugal.',webLink:'#'},
+  {id:'d2',subject:'Revisão contrato — urgente',from:{emailAddress:{name:'Ana Rodrigues',address:'ana.r@empresa.pt'}},isDirect:true,receivedDateTime:new Date(Date.now()-7200000).toISOString(),bodyPreview:'Gisela, confirma se os termos da cláusula 7 relativa à facturação estão corretos. Precisamos de fechar até sexta.',webLink:'#'},
+  {id:'d3',subject:'Prazo Modelo 22 IRC 2024',from:{emailAddress:{name:'Portal das Finanças',address:'noreply@portaldasfinancas.gov.pt'}},isDirect:true,receivedDateTime:new Date(Date.now()-86400000).toISOString(),bodyPreview:'O prazo para entrega da Declaração Modelo 22 referente ao exercício de 2024 termina a 31 de julho de 2025.',webLink:'#'},
+  {id:'d4',subject:'Reunião equipa — quinta 14h',from:{emailAddress:{name:'Direção Alavan',address:'direcao@alavan.pt'}},isDirect:false,receivedDateTime:new Date(Date.now()-172800000).toISOString(),bodyPreview:'Convocam-se todos os colaboradores para reunião de equipa na quinta-feira às 14h. Ordem de trabalhos: resultados Q1, perspetivas Q2.',webLink:'#'},
+];
+
+// ── STATE ───────────────────────────────────────────────────────
+let cfg = JSON.parse(localStorage.getItem('em3_cfg')||'{}');
+cfg = {clientId:'801ae963-ece9-48b9-94a1-c01c0c8c5d6b',geminiKey:'',asanaToken:'',asanaProjectGid:'',asanaProjectName:'',...cfg};
+
+let state = {
+  screen: 'setup', tab: 'ms',
+  token: null, myEmail: '',
+  emails: [], idx: 0, processed: 0,
+  ai: null, aiLoading: false,
+  replyText: '', replyMode: 'general', replyLoading: false,
+  actionLoading: false, taskDone: false,
+  asanaProjects: [], asanaLoading: false,
+  error: '', demo: false,
+  loginLoading: false,
+};
+
+function saveCfg() { localStorage.setItem('em3_cfg', JSON.stringify(cfg)); }
+function setState(patch) { Object.assign(state, patch); render(); }
+
+// ── PKCE OAuth (no MSAL) ────────────────────────────────────────
+function b64url(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+}
+function genVerifier() {
+  const a = new Uint8Array(32); crypto.getRandomValues(a); return b64url(a);
+}
+async function genChallenge(v) {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v));
+  return b64url(d);
+}
+
+async function loginMicrosoft() {
+  setState({loginLoading:true, error:''});
+  try {
+    const verifier = genVerifier();
+    const challenge = await genChallenge(verifier);
+    const nonce = Math.random().toString(36);
+    const scope = 'Mail.Read Mail.ReadWrite Mail.Send User.Read offline_access';
+    const url = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${cfg.clientId}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(scope)}&code_challenge=${challenge}&code_challenge_method=S256&state=${nonce}&response_mode=query&prompt=select_account`;
+
+    const popup = window.open(url, 'mslogin', 'width=520,height=640,left=200,top=100');
+    if (!popup) { setState({error:'Popup bloqueado — permite popups para esta página no browser.', loginLoading:false}); return; }
+
+    const code = await new Promise((resolve, reject) => {
+      const timer = setInterval(() => {
+        try {
+          const pu = popup.location.href;
+          if (pu.startsWith(REDIRECT_URI) && pu.includes('code=')) {
+            clearInterval(timer);
+            popup.close();
+            resolve(new URL(pu).searchParams.get('code'));
+          }
+        } catch(e) { /* cross-origin, keep waiting */ }
+        if (popup.closed) { clearInterval(timer); reject(new Error('Login cancelado.')); }
+      }, 300);
+      setTimeout(() => { clearInterval(timer); popup.close(); reject(new Error('Timeout — tenta de novo.')); }, 120000);
+    });
+
+    const tr = await fetch(`https://login.microsoftonline.com/common/oauth2/v2.0/token`, {
+      method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body: new URLSearchParams({client_id:cfg.clientId,code,redirect_uri:REDIRECT_URI,grant_type:'authorization_code',code_verifier:verifier,scope})
+    });
+    const td = await tr.json();
+    if (td.error) throw new Error(td.error_description || td.error);
+
+    const me = await (await fetch(`${GRAPH}/me?$select=mail,userPrincipalName`,{headers:{Authorization:`Bearer ${td.access_token}`}})).json();
+    const myEmail = (me.mail||me.userPrincipalName||'').toLowerCase();
+    state.token = td.access_token; state.myEmail = myEmail;
+    await loadEmails(td.access_token, myEmail);
+  } catch(e) {
+    setState({error:`Erro: ${e.message}`, loginLoading:false});
+  }
+}
+
+async function loadEmails(t, me) {
+  setState({screen:'loading'});
+  try {
+    const d = await (await fetch(`${GRAPH}/me/mailFolders/inbox/messages?$top=40&$select=id,subject,from,toRecipients,receivedDateTime,bodyPreview,isRead,webLink&$orderby=receivedDateTime desc`,{headers:{Authorization:`Bearer ${t}`}})).json();
+    if (d.error) throw new Error(d.error.message);
+    const list = (d.value||[]).filter(e=>!e.isRead).map(e=>({...e,isDirect:e.toRecipients?.some(r=>r.emailAddress?.address?.toLowerCase()===me)}));
+    list.sort((a,b)=>(b.isDirect?1:0)-(a.isDirect?1:0));
+    state.emails = list; state.idx = 0; state.processed = 0; state.demo = false;
+    if (!list.length) { setState({screen:'done'}); return; }
+    setState({screen:'emails'});
+    summarize(list[0]);
+  } catch(e) { setState({error:`Erro: ${e.message}`, screen:'setup', loginLoading:false}); }
+}
+
+function startDemo() {
+  state.emails = DEMO; state.idx = 0; state.processed = 0; state.demo = true;
+  setState({screen:'emails', ai:null, taskDone:false});
+  summarize(DEMO[0]);
+}
+
+async function callGemini(prompt, system) {
+  const body = {contents:[{parts:[{text:prompt}]}]};
+  if (system) body.system_instruction = {parts:[{text:system}]};
+  const r = await fetch(`${GEMINI_URL}?key=${cfg.geminiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d = await r.json();
+  if (d.error) throw new Error(d.error.message);
+  return d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+}
+
+async function summarize(email) {
+  setState({ai:null, aiLoading:true, taskDone:false});
+  if (!cfg.geminiKey) { setState({aiLoading:false}); return; }
+  try {
+    const txt = await callGemini(`Analisa este email. Responde APENAS com JSON válido sem markdown:\n{"resumo":"2 frases em português","urgencia":"alta|media|baixa","acao":"arquivar|responder|responder_fiscal|tarefa|guardar"}\n\nDe: ${email.from?.emailAddress?.name}\nTipo: ${email.isDirect?'Direto':'Cópia'}\nAssunto: ${email.subject}\nMensagem: ${(email.bodyPreview||'').slice(0,500)}`);
+    setState({ai: JSON.parse(txt.replace(/```[a-z]*|```/g,'').trim()), aiLoading:false});
+  } catch { setState({ai:{resumo:'Resumo não disponível.',urgencia:'media',acao:'guardar'}, aiLoading:false}); }
+}
+
+async function advance(n) {
+  state.processed++;
+  if (n >= state.emails.length) { setState({screen:'done'}); return; }
+  state.idx = n; state.ai = null; state.taskDone = false;
+  setState({screen:'emails', aiLoading:true});
+  summarize(state.emails[n]);
+}
+
+async function doArchive() {
+  setState({actionLoading:true});
+  if (!state.demo) try { await fetch(`${GRAPH}/me/messages/${state.emails[state.idx].id}/move`,{method:'POST',headers:{Authorization:`Bearer ${state.token}`,'Content-Type':'application/json'},body:JSON.stringify({destinationId:'archive'})}); } catch{}
+  setState({actionLoading:false});
+  advance(state.idx+1);
+}
+async function doDelete() {
+  setState({actionLoading:true});
+  if (!state.demo) try { await fetch(`${GRAPH}/me/messages/${state.emails[state.idx].id}`,{method:'DELETE',headers:{Authorization:`Bearer ${state.token}`}}); } catch{}
+  setState({actionLoading:false});
+  advance(state.idx+1);
+}
+function doSkip() { advance(state.idx+1); }
+function openEmail() { const w=state.emails[state.idx]?.webLink; if(w&&w!=='#') window.open(w,'_blank'); }
+
+async function doAsana() {
+  if (!cfg.asanaProjectGid||!cfg.asanaToken) { setState({error:'Configura o Asana primeiro.'}); return; }
+  setState({actionLoading:true});
+  try {
+    const em = state.emails[state.idx];
+    await fetch('https://app.asana.com/api/1.0/tasks',{method:'POST',headers:{Authorization:`Bearer ${cfg.asanaToken}`,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({data:{name:`📧 ${em.subject}`,notes:`De: ${em.from?.emailAddress?.name}\nData: ${new Date(em.receivedDateTime).toLocaleDateString('pt-PT')}\n${state.ai?.resumo||em.bodyPreview?.slice(0,300)||''}`,projects:[cfg.asanaProjectGid]}})});
+    setState({taskDone:true, actionLoading:false});
+  } catch(e) { setState({error:'Erro Asana: '+e.message, actionLoading:false}); }
+}
+
+async function startReply(mode) {
+  if (!cfg.geminiKey) { setState({error:'Chave Gemini em falta.'}); return; }
+  setState({screen:'reply', replyMode:mode, replyLoading:true, replyText:''});
+  const em = state.emails[state.idx];
+  try {
+    const system = mode==='fiscal' ? FISCAL : null;
+    const prompt = mode==='fiscal'
+      ? `Redige resposta profissional e fundamentada em legislação fiscal portuguesa:\nDe: ${em.from?.emailAddress?.name}\nAssunto: ${em.subject}\nMensagem: ${(em.bodyPreview||'').slice(0,600)}`
+      : `Resposta profissional em português, apenas o corpo:\nDe: ${em.from?.emailAddress?.name}\nAssunto: ${em.subject}\nMensagem: ${(em.bodyPreview||'').slice(0,500)}`;
+    const txt = await callGemini(prompt, system);
+    setState({replyText:txt, replyLoading:false});
+  } catch(e) { setState({replyText:'', replyLoading:false, error:'Erro Gemini: '+e.message}); }
+}
+
+async function sendReply() {
+  setState({actionLoading:true});
+  if (!state.demo) try { await fetch(`${GRAPH}/me/messages/${state.emails[state.idx].id}/reply`,{method:'POST',headers:{Authorization:`Bearer ${state.token}`,'Content-Type':'application/json'},body:JSON.stringify({message:{body:{contentType:'Text',content:state.replyText}}})}); } catch{}
+  setState({actionLoading:false, replyText:''});
+  advance(state.idx+1);
+}
+
+async function loadAsana() {
+  setState({asanaLoading:true});
+  try {
+    const d = await (await fetch('https://app.asana.com/api/1.0/projects?limit=50&archived=false',{headers:{Authorization:`Bearer ${cfg.asanaToken}`,Accept:'application/json'}})).json();
+    setState({asanaProjects: d.data||[], asanaLoading:false});
+  } catch { setState({asanaLoading:false}); }
+}
+
+// ── HELPERS ─────────────────────────────────────────────────────
+const COLORS = ['#1B4332','#1E3A5F','#7F1D1D','#4A1D96','#78350F','#134E4A'];
+function avatarColor(name) { return COLORS[(name||'').charCodeAt(0)%COLORS.length]; }
+function avatarInitials(name) { return (name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
+function fmtDate(d) { return new Date(d).toLocaleDateString('pt-PT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}); }
+
+// ── RENDER ───────────────────────────────────────────────────────
+function h(tag, attrs, ...children) {
+  const el = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs||{})) {
+    if (k==='class') el.className=v;
+    else if (k.startsWith('on')) el[k]=v;
+    else el.setAttribute(k,v);
+  }
+  for (const c of children.flat()) {
+    if (c==null) continue;
+    el.appendChild(typeof c==='string'?document.createTextNode(c):c);
+  }
+  return el;
+}
+
+function render() {
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+  app.appendChild(renderScreen());
+}
+
+function renderScreen() {
+  switch(state.screen) {
+    case 'setup': return renderSetup();
+    case 'loading': return renderLoading();
+    case 'emails': return state.emails[state.idx] ? renderEmail() : renderDone();
+    case 'reply': return renderReply();
+    case 'done': return renderDone();
+    default: return renderSetup();
+  }
+}
+
+function renderSetup() {
+  const wrap = h('div',{style:'min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;width:100%'});
+  const card = h('div',{class:'card'});
+
+  card.appendChild(h('div',{class:'hdr',style:'background:#1C1917'},
+    h('div',{style:'font-size:38px;margin-bottom:5px'},'📬'),
+    h('h1',{},'Gestor de Correio'),
+    h('p',{},'Outlook · Gemini (gratuito) · Asana')
+  ));
+
+  const body = h('div',{class:'body'});
+
+  // Demo button
+  const demoBtn = h('button',{style:'width:100%;background:#F0FDF4;border:2px solid #BBF7D0;border-radius:11px;padding:11px;font-family:Nunito;font-weight:700;font-size:13px;color:#15803D;margin-bottom:14px',onclick:startDemo},'🎯 Experimentar com emails de demonstração');
+  body.appendChild(demoBtn);
+
+  // Tabs
+  const tabs = h('div',{class:'tabs'});
+  [['ms','📧 Outlook'],['ai','🤖 Gemini'],['asana','📋 Asana']].forEach(([k,l])=>{
+    const t = h('button',{class:'tab'+(state.tab===k?' active':''),onclick:()=>setState({tab:k})},l);
+    tabs.appendChild(t);
+  });
+  body.appendChild(tabs);
+
+  // Tab content
+  if (state.tab==='ms') {
+    body.appendChild(h('p',{style:'font-size:12px;color:#78716C;line-height:1.6;margin-bottom:8px'},'Client ID pré-configurado.'));
+    body.appendChild(h('label',{},'Microsoft Client ID'));
+    const inp = h('input',{value:cfg.clientId,placeholder:'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'});
+    inp.oninput=e=>{cfg.clientId=e.target.value;saveCfg();};
+    body.appendChild(inp);
+    body.appendChild(h('div',{class:'info',style:'margin-top:8px'},
+      h('strong',{},'URL para adicionar no Azure: '),
+      h('code',{},REDIRECT_URI)
+    ));
+  }
+  if (state.tab==='ai') {
+    body.appendChild(h('div',{class:'success'},'✅ Gratuito! Gemini 2.0 Flash — 1500 pedidos/dia, sem cartão.'));
+    body.appendChild(h('p',{style:'font-size:12px;color:#78716C;margin-bottom:6px'},'Obtém em aistudio.google.com/apikey'));
+    body.appendChild(h('label',{},'Chave API Gemini'));
+    const inp = h('input',{type:'password',value:cfg.geminiKey,placeholder:'AIza...'});
+    inp.oninput=e=>{cfg.geminiKey=e.target.value;saveCfg();};
+    body.appendChild(inp);
+  }
+  if (state.tab==='asana') {
+    body.appendChild(h('p',{style:'font-size:12px;color:#78716C;margin-bottom:6px'},'Token em app.asana.com/0/my-apps → Personal access tokens.'));
+    body.appendChild(h('label',{},'Asana Token'));
+    const inp = h('input',{value:cfg.asanaToken,placeholder:'1/xxxxx...'});
+    inp.oninput=e=>{cfg.asanaToken=e.target.value;saveCfg();};
+    body.appendChild(inp);
+    const loadBtn = h('button',{style:'width:100%;background:#1C1917;color:#fff;border:none;border-radius:9px;padding:9px;font-family:Nunito;font-weight:700;font-size:12px;margin-top:8px',onclick:loadAsana},state.asanaLoading?'A carregar...':'Carregar projetos');
+    body.appendChild(loadBtn);
+    if (state.asanaProjects.length) {
+      body.appendChild(h('label',{},'Projeto'));
+      const sel = h('select',{style:'margin-top:4px'},h('option',{value:''},'Selecionar...'));
+      state.asanaProjects.forEach(p=>{
+        const o=h('option',{value:p.gid},p.name);
+        if(p.gid===cfg.asanaProjectGid)o.selected=true;
+        sel.appendChild(o);
+      });
+      sel.onchange=e=>{cfg.asanaProjectGid=e.target.value;cfg.asanaProjectName=e.target.options[e.target.selectedIndex].text;saveCfg();};
+      body.appendChild(sel);
+    }
+  }
+
+  if (state.error) body.appendChild(h('div',{class:'error'},'⚠ '+state.error));
+
+  const loginBtn = h('button',{class:'btn-main',onclick:loginMicrosoft},state.loginLoading?'A entrar...':'🔐 Entrar com Microsoft');
+  if (state.loginLoading) loginBtn.disabled=true;
+  body.appendChild(loginBtn);
+  body.appendChild(h('p',{style:'text-align:center;font-size:10px;color:#C4B5A0;margin-top:8px'},'Os emails nunca são guardados. Tudo é processado localmente.'));
+
+  card.appendChild(body);
+  wrap.appendChild(card);
+  return wrap;
+}
+
+function renderLoading() {
+  return h('div',{style:'min-height:100vh;display:flex;align-items:center;justify-content:center;width:100%'},
+    h('div',{class:'card',style:'padding:40px;text-align:center'},
+      h('div',{style:'font-size:44px;margin-bottom:12px'},'⏳'),
+      h('h2',{style:'font-family:Fraunces,serif;font-weight:300;color:#1C1917'},'A carregar emails...')
+    )
+  );
+}
+
+function renderEmail() {
+  const em = state.emails[state.idx];
+  const total = state.emails.length;
+  const fn = em.from?.emailAddress?.name||em.from?.emailAddress?.address||'?';
+  const fa = em.from?.emailAddress?.address||'';
+  const acMap={arquivar:'Arquivar',responder:'Responder',responder_fiscal:'Resp. Fiscal',tarefa:'Criar Tarefa',guardar:'Guardar'};
+
+  const wrap = h('div',{style:'min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;width:100%'});
+  if (state.demo) wrap.appendChild(h('div',{style:'background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:6px 14px;margin-bottom:10px;font-size:11px;color:#92400E;font-weight:700;max-width:480px;width:100%;text-align:center'},'🎯 Modo demonstração — emails não são reais'));
+
+  const card = h('div',{class:'card'});
+  const body = h('div',{style:'padding:13px 18px 16px'});
+
+  // Progress
+  const pct = (state.idx/total)*100;
+  body.appendChild(h('div',{style:'display:flex;justify-content:space-between;font-size:11px;color:#A8A29E;font-weight:700;margin-bottom:4px'},
+    h('span',{},`📬 ${state.idx+1} / ${total}`),
+    h('span',{},`${state.processed} tratados`)
+  ));
+  body.appendChild(h('div',{class:'progress-bar'},h('div',{class:'progress-fill',style:`width:${pct}%`})));
+
+  // Sender
+  const fromRow = h('div',{class:'email-from'});
+  fromRow.appendChild(h('div',{class:'avatar',style:`background:${avatarColor(fn)}`},avatarInitials(fn)));
+  const fromInfo = h('div',{style:'flex:1;min-width:0'});
+  const nameRow = h('div',{style:'font-weight:800;font-size:13px;color:#1C1917;display:flex;align-items:center;gap:5px;flex-wrap:wrap'},fn);
+  const badge = h('span',{class:'badge',style:em.isDirect?'background:#FEE2E2;color:#991B1B':'background:#F3F4F6;color:#6B7280'},em.isDirect?'● DIRETO':'● CÓPIA');
+  nameRow.appendChild(badge);
+  fromInfo.appendChild(nameRow);
+  fromInfo.appendChild(h('div',{style:'font-size:10px;color:#A8A29E;overflow:hidden;text-overflow:ellipsis;white-space:nowrap'},`${fa} · ${fmtDate(em.receivedDateTime)}`));
+  fromRow.appendChild(fromInfo);
+  body.appendChild(fromRow);
+
+  body.appendChild(h('h2',{style:'font-family:Fraunces,serif;font-size:17px;font-weight:400;color:#1C1917;margin:0 0 9px;line-height:1.3'},em.subject||'(sem assunto)'));
+  body.appendChild(h('div',{class:'preview'},em.bodyPreview||'Sem pré-visualização.'));
+
+  // AI
+  if (state.aiLoading) {
+    body.appendChild(h('div',{style:'background:#F0FDF4;border-radius:9px;padding:9px 11px;margin-bottom:12px;font-size:12px;color:#78716C;display:flex;align-items:center;gap:7px'},
+      h('span',{class:'pulse'},'🤖'),' A analisar com Gemini...'
+    ));
+  } else if (state.ai) {
+    const aiBox = h('div',{class:'ai-box'});
+    const aiHdr = h('div',{style:'display:flex;justify-content:space-between;align-items:center;margin-bottom:5px'});
+    aiHdr.appendChild(h('span',{style:'font-size:10px;font-weight:800;color:#15803D;text-transform:uppercase;letter-spacing:.5px'},'🤖 Gemini'));
+    const urgColors={alta:'background:#FEE2E2;color:#991B1B',media:'background:#FEF3C7;color:#92400E',baixa:'background:#D1FAE5;color:#065F46'};
+    const urgLabels={alta:'⚠ Urgente',media:'📋 Normal',baixa:'✔ Baixa'};
+    const urgStyle = urgColors[state.ai.urgencia]||'background:#F3F4F6;color:#374151';
+    aiHdr.appendChild(h('span',{class:'badge',style:urgStyle},urgLabels[state.ai.urgencia]||''));
+    aiBox.appendChild(aiHdr);
+    aiBox.appendChild(h('p',{style:'margin:0;font-size:13px;color:#1C1917;line-height:1.6'},state.ai.resumo));
+    if (state.ai.acao) aiBox.appendChild(h('p',{style:'margin:5px 0 0;font-size:11px;color:#15803D;font-weight:700'},`💡 Sugestão: ${acMap[state.ai.acao]||state.ai.acao}`));
+    body.appendChild(aiBox);
+  }
+
+  // Action buttons row 1
+  const row1 = h('div',{class:'actions'});
+  const btns1 = [
+    {bg:'#1B4332',ico:'🗂️',lbl:'Arquivar',onclick:doArchive},
+    {bg:'#1E3A5F',ico:'↩️',lbl:'Responder',onclick:()=>startReply('general')},
+    {bg:'#4A1D96',ico:'⚖️',lbl:'Resp. Fiscal',onclick:()=>startReply('fiscal')},
+  ];
+  btns1.forEach(b=>{
+    const btn=h('button',{class:'act-btn',style:`background:${b.bg}`,onclick:b.onclick},
+      h('span',{class:'ico'},b.ico),b.lbl);
+    if(state.actionLoading)btn.disabled=true;
+    row1.appendChild(btn);
+  });
+  body.appendChild(row1);
+
+  // Action buttons row 2
+  const row2 = h('div',{class:'actions2'});
+  const asanaBg = state.taskDone?'#1B4332':'#78350F';
+  const btns2 = [
+    {bg:asanaBg,ico:state.taskDone?'✅':'📋',lbl:state.taskDone?'Criado!':'Asana',onclick:doAsana,dis:state.actionLoading||(!cfg.asanaProjectGid&&!state.taskDone)},
+    {bg:'#374151',ico:'🔗',lbl:'Abrir',onclick:openEmail,dis:!em.webLink||em.webLink==='#'},
+    {bg:'#7F1D1D',ico:'🗑️',lbl:'Apagar',onclick:doDelete,dis:state.actionLoading},
+    {bg:'#E5E7EB',ico:'⏭️',lbl:'Saltar',color:'#374151',onclick:doSkip,dis:state.actionLoading},
+  ];
+  btns2.forEach(b=>{
+    const btn=h('button',{class:'act-btn sm',style:`background:${b.bg};color:${b.color||'#fff'}`,onclick:b.onclick},
+      h('span',{class:'ico'},b.ico),b.lbl);
+    if(b.dis)btn.disabled=true;
+    row2.appendChild(btn);
+  });
+  body.appendChild(row2);
+
+  if (state.error) {
+    const err = h('div',{class:'error',style:'margin-top:8px;display:flex;justify-content:space-between'},
+      '⚠ '+state.error,
+      h('button',{style:'background:none;border:none;cursor:pointer;font-weight:800;color:#991B1B',onclick:()=>setState({error:''})},'✕')
+    );
+    body.appendChild(err);
+  }
+
+  card.appendChild(body);
+  wrap.appendChild(card);
+  return wrap;
+}
+
+function renderReply() {
+  const em = state.emails[state.idx];
+  const isFiscal = state.replyMode==='fiscal';
+  const wrap = h('div',{style:'min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;width:100%'});
+
+  if (state.demo) wrap.appendChild(h('div',{style:'background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:6px 14px;margin-bottom:10px;font-size:11px;color:#92400E;font-weight:700;max-width:480px;width:100%;text-align:center'},'🎯 Demo — o email não será enviado'));
+
+  const card = h('div',{class:'card'});
+  card.appendChild(h('div',{class:'hdr '+(isFiscal?'fiscal-hdr':''),style:'background:'+(isFiscal?'#4A1D96':'#1E3A5F'),padding:'16px 22px',textAlign:'left'},
+    h('h2',{style:'font-family:Fraunces,serif;font-weight:300;font-size:17px;color:#fff;margin:0'},isFiscal?'⚖️ Agente Fiscal':'↩️ Responder'),
+    h('p',{style:'color:'+(isFiscal?'#C4B5FD':'#93C5FD')+';font-size:11px;margin:3px 0 0'},'Para: '+(em?.from?.emailAddress?.name||em?.from?.emailAddress?.address||''))
+  ));
+  if (isFiscal) card.appendChild(h('div',{class:'fiscal-info'},'Fundamentada em: CIVA · CIRC · CIRS · CIMT · CDTs · Inf. Vinculativas AT · Pareceres OCC'));
+
+  const body = h('div',{style:'padding:16px 20px 20px'});
+  if (state.replyLoading) {
+    body.appendChild(h('div',{style:'text-align:center;padding:32px 0;color:#78716C'},
+      h('div',{style:'font-size:26px;margin-bottom:7px'},isFiscal?'⚖️':'🤖'),
+      isFiscal?'A consultar legislação fiscal...':'A gerar resposta...'
+    ));
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = state.replyText;
+    ta.oninput = e => { state.replyText = e.target.value; };
+    body.appendChild(ta);
+  }
+
+  const btns = h('div',{class:'reply-btns'});
+  btns.appendChild(h('button',{class:'reply-back',onclick:()=>setState({screen:'emails'})},'← Voltar'));
+  const sendBtn = h('button',{class:'reply-send',style:`background:${isFiscal?'#4A1D96':'#1E3A5F'}`,onclick:sendReply},'📤 Enviar Resposta');
+  if (state.replyLoading||state.actionLoading||!state.replyText.trim()) sendBtn.disabled=true;
+  btns.appendChild(sendBtn);
+  body.appendChild(btns);
+  card.appendChild(body);
+  wrap.appendChild(card);
+  return wrap;
+}
+
+function renderDone() {
+  return h('div',{style:'min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;width:100%'},
+    h('div',{class:'card done-wrap'},
+      h('div',{style:'font-size:52px;margin-bottom:10px'},'✅'),
+      h('h1',{style:'font-family:Fraunces,serif;font-weight:300;font-size:24px;color:#1C1917;margin:0'},'Caixa limpa!'),
+      h('p',{style:'color:#78716C;font-size:13px;margin:8px 0 22px'},'Trataste de ',h('strong',{},String(state.processed)),' email'+(state.processed!==1?'s':''),'.'),
+      (() => {
+        const b = h('button',{class:'btn-main',onclick:()=>{ if(state.demo)startDemo(); else loadEmails(state.token,state.myEmail); }},state.demo?'🔄 Reiniciar demonstração':'🔄 Verificar novos emails');
+        return b;
+      })(),
+      h('button',{style:'background:none;border:none;color:#A8A29E;font-size:11px;font-family:Nunito;margin-top:8px',onclick:()=>setState({screen:'setup',loginLoading:false})},'⚙ Definições')
+    )
+  );
+}
+
+// Handle OAuth redirect
+(function checkRedirect() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('code')) {
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+})();
+
+render();
+</script>
+</body>
+</html>
